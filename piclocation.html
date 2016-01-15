@@ -1,0 +1,49 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, minimum-scale=1.0, maximum-scale=2.0,user-scalable=no"/>
+    <title>exif图片位置</title>
+    <link href="leaflet.css" rel="stylesheet">
+    <script src='leaflet-src.js'></script>
+    <!--国内地图瓦片纠偏js-->
+    <script src="geo.convertor.js"></script>
+	<style>
+		html,body{height:100%;margin:0;padding:0;}
+		.popup_diy .leaflet-popup-content{margin:5px;}
+		.popup_diy .leaflet-popup-content-wrapper{border-radius:0px !important;}
+	</style>
+</head>
+<body>
+	
+	<div id="map" class="wechat-loading" style="height:100%;width:100%;"></div>
+	
+<script>
+
+		var u_O = {},x = window.location.search.substring(1).split('&');
+		for(var k in x){
+			var a = x[k].split('=');
+			u_O[a[0]] = a[1];
+		}
+		console.log(u_O);
+		function convertPoint(arr){
+			var obj = GEO.GPS2gcj(arr.length ? {lat:arr[0]*1,lng:arr[1]*1} : arr);
+			return [obj.lat,obj.lng];	//纠偏
+			//return arr;				//不纠偏
+		}
+		var picError = function(ele){
+			// ele.src = "/theme/static/images/pic_error.png";
+		}
+		var map = L.map('map',{zoomControl:false}).setView(convertPoint([32.76880048488168,97.119140625]), 3 );
+		//var url = 'http://agri-map.xaircraft.com/google/{z}/{x}/{y}.jpeg';
+		var url='http://agri-map.xaircraft.com/tile.php?source=google_god&x={x}&y={y}&z={z}';
+		L.tileLayer(url, {attribution:false,maxZoom: 19}).addTo(map);
+		if(u_O.latitude&&u_O.longitude&&u_O.blob){
+			var marker = L.marker(convertPoint([u_O.latitude,u_O.longitude]))
+						.bindPopup('<div class="popupImg" style="height:300px;width:300px;overflow:hidden;background:#f3f3f3;"><img style="max-width:300px;max-height:300px;display:block;margin:auto;" src="'+u_O.blob+'"></div>',{offset:[0,-40],closeButton:false,className:'popup_diy'})
+						.addTo(map).openPopup();
+			map.setView(convertPoint([u_O.latitude,u_O.longitude]),17);
+		}
+</script>
+</body>
+</html>
