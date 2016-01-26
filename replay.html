@@ -1,0 +1,305 @@
+<!doctype html>
+<html>
+<head>
+	<meta charset="utf-8" />
+    <link href="theme.css" rel="stylesheet">
+    <link href="monitor.css" rel="stylesheet">
+    <link rel="stylesheet" href="leaflet/leaflet.css" />
+    <script src="jquery2.1.1.js"></script>
+    <script src="leaflet/leaflet.js"></script>  
+	<title>航班回放</title>
+</head>
+<body>
+	<div id="map" style="width:100%;height:100%;"></div>
+    <div class="fix-header-top">
+        <span>开始时间：</span>
+        <span>结束时间：<span name="no">未知</span></span>
+        <span>航线ID：<span name="no">未知</span></span>
+        <span>航线长度：<span name="no">未知</span></span>
+        <span>航线模式：<span name="no">未知</span></span>
+        <span>航点数：<span name="no">未知</span></span>
+        <span>航线状态：<span name="no">未知</span></span>
+        <span>黑匣子ID：<span name="no">未知</span></span>
+        <span>卫星数：<span name="no">未知</span></span>
+        <span>卫星精度：<span name="no">未知</span></span>
+        <span>定位状态：<span name="no">未知</span></span>
+    </div>
+    
+    <div class="player-box">
+        <div class="player-info">
+            <div class="player-btn fl">
+                <div class="player-start" id="player-control"></div>
+            </div>
+            <div class="player-btn player-end fl"></div>
+            <div class="player-btn player-quick fl">
+                <div class="player-speed">1</div>
+            </div>
+            <span style="color:#888"><span class="player-now">00:00</span> / <span class="player-time">00:00</span></span>
+        </div>
+        <div style="flex:1;padding:0 20px;display:flex;justify-content:center;align-items:center;">
+            <div class="player-bar">
+                <div class="player-line"></div>
+                <div class="player-point" id="player-pointer"></div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        var map = L.map('map',{zoomControl:false,fullscreenControl: true,attributionControl:false}).setView([32.76880048488168,97.119140625], 3 );
+        var url = 'http://agri-map.xaircraft.com/google/{z}/{x}/{y}.jpeg';
+        //var url = 'http://agri-map.xaircraft.com/tile.php?source=google_god&x={x}&y={y}&z={z}';
+        L.tileLayer(url, {maxZoom: 19}).addTo(map);
+        var polyline = new L.Polyline([], {color: 'white',weight:5,opacity:0.4}).addTo(map);
+        var polylineGo = new L.Polyline([], {color: 'yellow',weight:5,opacity:0.9}).addTo(map);
+        var rightPoints = [];
+        function createIcon(name,size,offset){
+            return L.icon({
+                iconUrl: 'images/'+name+'.png',
+                iconSize:[30,50],
+                iconAnchor:[15,49]
+            });
+        }
+        // var markers = new L.markerClusterGroup({disableClusteringAtZoom: 18});
+        var markers = new L.FeatureGroup(),uavPoint;
+
+        $.get('data.json',function(rs){
+            console.log(rs);
+            if(rs.status == 200){
+                for(var i in rs.data){
+                    if(rs.data[i].alarm_status == 0){
+                        polyline.addLatLng(rs.data[i]);
+                        rightPoints.push(rs.data[i]);
+                        // if(dev_log[x].cn0 == 1){
+                            //opt.icon = icon_error_02;
+                        // }
+                    }else{
+                        //opt.icon = icon_error_01;
+                        //dev_log[x].error = 1;
+                    }
+                }
+                uavPoint = L.marker(rightPoints[0],{icon:createIcon('point_car')});
+                markers.addLayer(L.marker(rightPoints[0],{icon:createIcon('point_start')}));
+                markers.addLayer(L.marker(rightPoints[rightPoints.length-1],{icon:createIcon('point_end')}));
+                markers.addLayer(uavPoint);
+                markers.addTo(map);
+                Player(rightPoints);
+                polyline.getBounds()._northEast && map.fitBounds(polyline.getBounds());
+            }else{
+                alert(rs.message);
+            }
+            
+        });
+        function Player(data){
+            $('.player-time').html(setProgressTime(data.length));
+            var barWidth = $('.player-bar').width()+2;
+            var unitLen = barWidth/data.length;
+            $(window).resize(function(){
+                barWidth = $('.player-bar').width()+2;
+                unitLen = barWidth/data.length;
+            });
+
+            var timer = null,index = 0,speed = 1000,animationSpeed = 1;
+            var flag = true;   //判断进度条 true:点击事件  false:拖拽事件
+            var player = {
+                start:start,
+                pause:pause,
+                endcallback:endcallback
+            }
+            player.start();
+
+            function start(ix){
+                index = typeof(ix)!= 'number' ? Math.min(index,data.length-1) : ix;
+                //ts = (!!ts && typeof(ts) == 'number' && ts > 0 ) ? ts : 1000;
+                setAnimation(animationSpeed);
+                if(timer){clearInterval(timer)}
+                timer = setInterval(function(){
+                    rebind(index);
+                    if(++index >= data.length){
+                        if(timer){
+                            clearInterval(timer);
+                            timer = null;
+                            player.endcallback && player.endcallback();
+                        }
+                    }
+                },speed);
+                $('#player-control').removeClass('player-pause').addClass('player-start');
+            }
+            function pause(){
+                if(timer){clearInterval(timer);timer = null;}
+                $('#player-control').removeClass('player-start').addClass('player-pause');
+            }
+            function endcallback(){
+                $('#player-control').removeClass('player-start').addClass('player-pause');
+                index = 0;
+                $('.player-now').html('00:00');
+                clearAnimation();
+                setProgress(0);
+                uavPoint.setLatLng(rightPoints[0]);
+                polylineGo.setLatLngs([]);
+            }
+            $('.player-btn:eq(0)').click(function(){
+                var child = $('#player-control');
+                if(child.hasClass('player-start')){
+                    child.removeClass('player-start').addClass('player-pause');
+                    player.pause();
+                }else{
+                    child.removeClass('player-pause').addClass('player-start');
+                    player.start();
+                }
+            });
+            $('.player-end').click(function(){
+                if(timer){
+                    clearInterval(timer);
+                    timer = null;
+                }
+                player.endcallback();
+            });
+
+            function rebind(ix){
+                $('.player-now').html(setProgressTime(index+1));
+                setProgress((ix+1)*unitLen);
+                if(data[ix] != null && JSON.stringify(data[ix])!='{}'){
+                    polylineGo.setLatLngs(data.slice(0,ix+1))
+                    uavPoint.setLatLng(data[ix]);
+                    // Data.bind(data[ix],'','',{'create_at':['data-create','create_at']});
+                    // $('[data-create]').html(new Date($('[data-create]').attr('data-create')*1000).format('yyyy-MM-dd HH:mm:ss'));
+                   
+                    // u.update({longitude:data[ix].longitude,latitude:data[ix].latitude});
+                }
+            }
+            
+            function setProgressTime(ix){
+                ix =  (ix && ix >= 0) ? ix : 0;
+                var sec = ix % 60;
+                var min = Math.floor(ix / 60);
+                if(sec<10) sec = '0'+sec;
+                if(min<10) min = '0'+min;
+                return min+':'+sec;
+            }
+
+            //快进
+            $('.player-quick').click(function() {
+                switch(speed){
+                    case 1000:{speed = 500;animationSpeed=0.5;$('.player-speed').html('2');break;}
+                    case 500:{speed = 250;animationSpeed=0.25;$('.player-speed').html('4');break;}
+                    case 250:{speed = 125;animationSpeed=0.125;$('.player-speed').html('8');break;}
+                    case 125:{speed = 1000;animationSpeed=1;$('.player-speed').html('1');break;}
+                }
+                player.start();
+            });
+
+            $('.player-bar').click(function(e) {
+                // if(flag){
+                    setProgress(e.offsetX);
+                    var p = e.offsetX/barWidth;
+                    p = p == 1 ? 0.999 : p;
+                    var i = Math.floor(p*data.length);
+                    player.start(i);
+                    clearAnimation();
+                    setProgress(e.offsetX);
+                    setAnimation(animationSpeed);
+                // }else{
+                //     flag = true;
+                // }
+            });
+            $("#player-pointer").click(function(e){
+                e.stopPropagation();
+                return false;
+            })
+
+            var progress = new window.E.drag(document.getElementById('player-pointer'),'left');
+
+            progress.onmovestart(function(){
+                //开始移动
+                player.pause();
+                clearAnimation();
+            });
+            progress.onmoveend(function(e){
+                //移动后
+                var p = $('.player-line').width()/barWidth;
+                p = p == 1 ? 0.999 : p;
+                var i = Math.floor(p*data.length);
+                player.start(i);
+                //可能会触发点击事件
+            });
+            progress.onmove(function(){
+                //移动中
+                // flag = false;
+                $('.player-line').width($("#player-pointer").css('left'));
+                if(parseInt($("#player-pointer").css('left')) >= barWidth){
+                    setProgress(barWidth);
+                }
+            });
+            function setAnimation(t){
+                $('.player-point').css({'transition':t+'s linear'});
+                $('.player-line').css({'transition':t+'s linear'});
+            }
+            function clearAnimation(){
+                $('.player-line').css({'transition':'0s'});
+                $('.player-point').css({'transition':'0s'});
+            }
+            function setProgress(w){
+                $("#player-pointer").css('left',w);
+                $('.player-line').width(w);
+            }
+
+        }
+
+
+        (function(){
+            function drag(box,direction){
+                var movestart = null,moveend=null,move=null;
+                this.onmovestart = function(c){ movestart = c;};
+                this.onmoveend = function(c){ moveend = c;};
+                this.onmove = function(c){ move = c;};
+
+                box.onmousedown = function(e){
+                    var disX=e.clientX-box.offsetLeft;
+                    var disY=e.clientY-box.offsetTop;
+                    if(movestart && $.isFunction(movestart)) movestart(e);
+
+                    document.onmousemove = function(e){
+                        e.preventDefault();
+                        var l=e.clientX-disX;
+                        var t=e.clientY-disY;
+                        if(l<0){
+                            l=0;
+                        }else if(l>document.documentElement.clientWidth-box.offsetWidth){
+                            l = document.documentElement.clientWidth-box.offsetWidth;
+                        }
+                        if(t<0){
+                            t=0;
+                        }else if(t>document.documentElement.clientHeight-box.offsetHeight){
+                            t = document.documentElement.clientHeight-box.offsetHeight;
+                        }
+                        if(direction && direction == 'top'){
+                            box.style.top=t+'px';
+                        }else if(direction && direction == 'left'){
+                            box.style.left=l+'px';
+                        }else{
+                            box.style.left=l+'px';
+                            box.style.top=t+'px';
+                        }
+                        if(move && $.isFunction(move)) move(e);
+                        return false;
+                    }
+                    document.onmouseup = function(e){
+                        document.onmousemove = null;    
+                        document.onmouseup = null;
+                        if(moveend && $.isFunction(moveend)) moveend(e);
+                        return false;
+                    }
+                    return false;
+                }
+            }
+            window.E = $.extend(window.E, { drag:drag });
+        })();
+    </script>
+
+
+</body>
+</html>
+
+<!-- <script src="http://api.map.baidu.com/api?v=2.0&ak=pjDPjbU6lzvnua750bHyd5UX"></script>
+<script src="/theme/sea.js"></script>
+<script src="replay.js"></script> -->
