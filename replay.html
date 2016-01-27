@@ -2,36 +2,38 @@
 <html>
 <head>
 	<meta charset="utf-8" />
-    <link href="theme.css" rel="stylesheet">
-    <link href="monitor.css" rel="stylesheet">
     <link rel="stylesheet" href="leaflet/leaflet.css" />
     <script src="jquery2.1.1.js"></script>
     <script src="leaflet/leaflet.js"></script>  
 	<title>航班回放</title>
+    <style>
+        body,html{margin:0;padding: 0;height: 100%;font-family: "Microsoft YaHei", "微软雅黑", "宋体", Tahoma, Helvetica; font-size: 12px;}
+        .player-box{width:96%;height:60px;background:rgba(0,0,0,0.8);position:absolute;bottom:20px;left:2%;display:flex;}
+        .player-bar{height: 10px;background:#555;position:relative;width:100%;cursor:pointer;}
+        .player-line{height:100%;width:0;background-image:linear-gradient(to right,blue,#3175C1);float:left;transition:1s linear;position: relative;}
+        .player-line:after{content:'';display:block;height:18px;width:18px;background:white;position:absolute;right:-8px;top:-4px;border-radius:100%;}
+        .player-point{width: 18px;height:18px;border-radius:100%;background:transparent;margin:-4px 0 0 -9px;position:absolute;left:0;cursor: pointer;transition:1s linear;}
+        .player-info{height:60px;width:300px;}
+        .player-info>span{margin-left:15px;margin-top:20px;line-height: 70px;}
+        .player-btn{width:32px;height:32px;border: 2px solid white;border-radius: 100%;margin:10.5px;cursor: pointer;position: relative;float:left;}
+        .player-pause{width:0;height:0;border-left:12px solid white;border-top:8px solid transparent;border-bottom:8px solid transparent;margin:8px 12px;}
+        .player-start{width:8px;height: 16px;border-left:3px #FFFFFF solid;border-right: 3px #FFFFFF solid;background: transparent;margin:8px 9px;}
+        .player-quick:after{content:'';display:block;position:absolute;border-left:12px solid white;border-top:8px solid transparent;border-bottom:8px solid transparent;top:8px;left:7px;}
+        .player-quick:before{content:'';display:block;position:absolute;border-left:12px solid white;border-top:8px solid transparent;border-bottom:8px solid transparent;top:8px;left:17px;}
+        .player-end:after{content:'';display:block;width:14px;height: 14px;background:white;margin:9px;}
+        .player-speed{color:white;position:absolute;top:-4px;right:-18px;}
+        .player-speed:before{content:'×';}
+    </style>
 </head>
 <body>
 	<div id="map" style="width:100%;height:100%;"></div>
-    <div class="fix-header-top">
-        <span>开始时间：</span>
-        <span>结束时间：<span name="no">未知</span></span>
-        <span>航线ID：<span name="no">未知</span></span>
-        <span>航线长度：<span name="no">未知</span></span>
-        <span>航线模式：<span name="no">未知</span></span>
-        <span>航点数：<span name="no">未知</span></span>
-        <span>航线状态：<span name="no">未知</span></span>
-        <span>黑匣子ID：<span name="no">未知</span></span>
-        <span>卫星数：<span name="no">未知</span></span>
-        <span>卫星精度：<span name="no">未知</span></span>
-        <span>定位状态：<span name="no">未知</span></span>
-    </div>
-    
     <div class="player-box">
         <div class="player-info">
-            <div class="player-btn fl">
+            <div class="player-btn">
                 <div class="player-start" id="player-control"></div>
             </div>
-            <div class="player-btn player-end fl"></div>
-            <div class="player-btn player-quick fl">
+            <div class="player-btn player-end"></div>
+            <div class="player-btn player-quick">
                 <div class="player-speed">1</div>
             </div>
             <span style="color:#888"><span class="player-now">00:00</span> / <span class="player-time">00:00</span></span>
@@ -47,7 +49,6 @@
     <script>
         var map = L.map('map',{zoomControl:false,fullscreenControl: true,attributionControl:false}).setView([32.76880048488168,97.119140625], 3 );
         var url = 'http://agri-map.xaircraft.com/google/{z}/{x}/{y}.jpeg';
-        //var url = 'http://agri-map.xaircraft.com/tile.php?source=google_god&x={x}&y={y}&z={z}';
         L.tileLayer(url, {maxZoom: 19}).addTo(map);
         var polyline = new L.Polyline([], {color: 'white',weight:5,opacity:0.4}).addTo(map);
         var polylineGo = new L.Polyline([], {color: 'yellow',weight:5,opacity:0.9}).addTo(map);
@@ -109,7 +110,6 @@
 
             function start(ix){
                 index = typeof(ix)!= 'number' ? Math.min(index,data.length-1) : ix;
-                //ts = (!!ts && typeof(ts) == 'number' && ts > 0 ) ? ts : 1000;
                 setAnimation(animationSpeed);
                 if(timer){clearInterval(timer)}
                 timer = setInterval(function(){
@@ -161,10 +161,6 @@
                 if(data[ix] != null && JSON.stringify(data[ix])!='{}'){
                     polylineGo.setLatLngs(data.slice(0,ix+1))
                     uavPoint.setLatLng(data[ix]);
-                    // Data.bind(data[ix],'','',{'create_at':['data-create','create_at']});
-                    // $('[data-create]').html(new Date($('[data-create]').attr('data-create')*1000).format('yyyy-MM-dd HH:mm:ss'));
-                   
-                    // u.update({longitude:data[ix].longitude,latitude:data[ix].latitude});
                 }
             }
             
@@ -299,7 +295,3 @@
 
 </body>
 </html>
-
-<!-- <script src="http://api.map.baidu.com/api?v=2.0&ak=pjDPjbU6lzvnua750bHyd5UX"></script>
-<script src="/theme/sea.js"></script>
-<script src="replay.js"></script> -->
