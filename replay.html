@@ -5,7 +5,7 @@
     <link rel="stylesheet" href="leaflet/leaflet.css" />
     <script src="jquery2.1.1.js"></script>
     <script src="leaflet/leaflet.js"></script>  
-	<title>车辆地图回放</title>
+	<title>车辆行驶记录回放</title>
     <style>
         body,html{margin:0;padding: 0;height: 100%;font-family: "Microsoft YaHei", "微软雅黑", "宋体", Tahoma, Helvetica; font-size: 12px;}
         .player-box{width:96%;height:60px;background:rgba(0,0,0,0.8);position:absolute;bottom:20px;left:2%;display:flex;}
@@ -48,7 +48,7 @@
 
     <script>
         var map = L.map('map',{zoomControl:false,fullscreenControl: true,attributionControl:false}).setView([32.76880048488168,97.119140625], 3 );
-        var url = 'http://agri-map.xaircraft.com/google/{z}/{x}/{y}.jpeg';
+        var url = 'http://mt3.google.cn/vt/lyrs=s&hl=zh-CN&gl=cn&x={x}&y={y}&z={z}';
         L.tileLayer(url, {maxZoom: 19}).addTo(map);
         var polyline = new L.Polyline([], {color: 'white',weight:5,opacity:0.4}).addTo(map);
         var polylineGo = new L.Polyline([], {color: 'yellow',weight:5,opacity:0.9}).addTo(map);
@@ -62,21 +62,12 @@
         }
         // var markers = new L.markerClusterGroup({disableClusteringAtZoom: 18});
         var markers = new L.FeatureGroup(),uavPoint;
-
-        $.get('data.json',function(rs){
+        $.getJSON('data.json',function(rs){
             console.log(rs);
             if(rs.status == 200){
+                rightPoints = rs.data;
                 for(var i in rs.data){
-                    if(rs.data[i].alarm_status == 0){
-                        polyline.addLatLng(rs.data[i]);
-                        rightPoints.push(rs.data[i]);
-                        // if(dev_log[x].cn0 == 1){
-                            //opt.icon = icon_error_02;
-                        // }
-                    }else{
-                        //opt.icon = icon_error_01;
-                        //dev_log[x].error = 1;
-                    }
+                    polyline.addLatLng(rs.data[i]);
                 }
                 uavPoint = L.marker(rightPoints[0],{icon:createIcon('point_car')});
                 markers.addLayer(L.marker(rightPoints[0],{icon:createIcon('point_start')}));
@@ -198,13 +189,13 @@
                 //     flag = true;
                 // }
             });
+            //避免拖动小圆点的时候触发点击实事件
             $("#player-pointer").click(function(e){
                 e.stopPropagation();
                 return false;
             })
 
             var progress = new window.E.drag(document.getElementById('player-pointer'),'left');
-
             progress.onmovestart(function(){
                 //开始移动
                 player.pause();
