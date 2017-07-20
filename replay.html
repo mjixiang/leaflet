@@ -153,7 +153,6 @@
                 setProgress((ix+1)*unitLen);
                 if(data[ix]){
                     polylineGo.setLatLngs(data.slice(0,ix+1))
-                    console.log(speed)
                     uavPoint.slideTo(data[ix],{duration:speed});
                 }
             }
