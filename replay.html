@@ -4,11 +4,12 @@
 	<meta charset="utf-8" />
     <link rel="stylesheet" href="leaflet/leaflet.css" />
     <script src="jquery2.1.1.js"></script>
-    <script src="leaflet/leaflet.js"></script>  
+    <script src="leaflet/leaflet.js"></script>
+    <script src="leaflet/Leaflet.Marker.SlideTo.js"></script>
 	<title>车辆行驶记录回放</title>
     <style>
         body,html{margin:0;padding: 0;height: 100%;font-family: "Microsoft YaHei", "微软雅黑", "宋体", Tahoma, Helvetica; font-size: 12px;}
-        .player-box{width:96%;height:60px;background:rgba(0,0,0,0.8);position:absolute;bottom:20px;left:2%;display:flex;}
+        .player-box{width:96%;height:60px;background:rgba(0,0,0,0.8);position:absolute;bottom:20px;left:2%;display:flex;z-index:401;}
         .player-bar{height: 10px;background:#555;position:relative;width:100%;cursor:pointer;}
         .player-line{height:100%;width:0;background-image:linear-gradient(to right,blue,#3175C1);float:left;transition:1s linear;position: relative;}
         .player-line:after{content:'';display:block;height:18px;width:18px;background:white;position:absolute;right:-8px;top:-4px;border-radius:100%;}
@@ -48,40 +49,43 @@
 
     <script>
         var map = L.map('map',{zoomControl:false,fullscreenControl: true,attributionControl:false}).setView([32.76880048488168,97.119140625], 3 );
-        var url = 'http://mt3.google.cn/vt/lyrs=s&hl=zh-CN&gl=cn&x={x}&y={y}&z={z}';
+        var url = 'http://{s}.tiles.mapbox.com/v3/spatialdev.map-c9z2cyef/{z}/{x}/{y}.png';
         L.tileLayer(url, {maxZoom: 19}).addTo(map);
         var polyline = new L.Polyline([], {color: 'white',weight:5,opacity:0.4}).addTo(map);
         var polylineGo = new L.Polyline([], {color: 'yellow',weight:5,opacity:0.9}).addTo(map);
-        var rightPoints = [];
+        var rightPoints = [];   //用来保存每个正确GPS坐标 
         function createIcon(name,size,offset){
             return L.icon({
                 iconUrl: 'images/'+name+'.png',
-                iconSize:[30,50],
-                iconAnchor:[15,49]
+                iconSize:size || [30,50],
+                iconAnchor:offset || [15,49]
             });
         }
-        // var markers = new L.markerClusterGroup({disableClusteringAtZoom: 18});
-        var markers = new L.FeatureGroup(),uavPoint;
+        var uavPoint,unitTime = 1000;
         $.getJSON('data.json',function(rs){
             console.log(rs);
             if(rs.status == 200){
-                rightPoints = rs.data;
-                for(var i in rs.data){
-                    polyline.addLatLng(rs.data[i]);
-                }
-                uavPoint = L.marker(rightPoints[0],{icon:createIcon('point_car')});
-                markers.addLayer(L.marker(rightPoints[0],{icon:createIcon('point_start')}));
-                markers.addLayer(L.marker(rightPoints[rightPoints.length-1],{icon:createIcon('point_end')}));
-                markers.addLayer(uavPoint);
-                markers.addTo(map);
-                Player(rightPoints);
+                //rs.data >= rightPoints;  rs.data.length:车辆运行时长,rightPoints:有效GPS坐标
+                rightPoints = rs.data.filter(function(p){
+                    return !!p;
+                });   //此处应该过滤掉无效点，因测试数据均为有效点因此不用处理。
+                polyline.setLatLngs(rightPoints);
+                uavPoint = L.marker(rightPoints[0],{icon:createIcon('point_car')}).addTo(map);
+                L.marker(rightPoints[0],{icon:createIcon('point_start')}).addTo(map);
+                L.marker(rightPoints[rightPoints.length-1],{icon:createIcon('point_end')}).addTo(map);
                 polyline.getBounds()._northEast && map.fitBounds(polyline.getBounds());
+                Player1(rightPoints);
+                // player = new mapPlayer(rs.data,function(data,sec){
+                //     //数据回调
+                //     console.log(data,sec);
+                // },{autoPlay:true});
             }else{
                 alert(rs.message);
             }
             
         });
-        function Player(data){
+        
+        function Player1(data){
             $('.player-time').html(setProgressTime(data.length));
             var barWidth = $('.player-bar').width()+2;
             var unitLen = barWidth/data.length;
@@ -89,9 +93,7 @@
                 barWidth = $('.player-bar').width()+2;
                 unitLen = barWidth/data.length;
             });
-
             var timer = null,index = 0,speed = 1000,animationSpeed = 1;
-            var flag = true;   //判断进度条 true:点击事件  false:拖拽事件
             var player = {
                 start:start,
                 pause:pause,
@@ -149,9 +151,10 @@
             function rebind(ix){
                 $('.player-now').html(setProgressTime(index+1));
                 setProgress((ix+1)*unitLen);
-                if(data[ix] != null && JSON.stringify(data[ix])!='{}'){
+                if(data[ix]){
                     polylineGo.setLatLngs(data.slice(0,ix+1))
-                    uavPoint.setLatLng(data[ix]);
+                    console.log(speed)
+                    uavPoint.slideTo(data[ix],{duration:speed});
                 }
             }
             
@@ -176,18 +179,14 @@
             });
 
             $('.player-bar').click(function(e) {
-                // if(flag){
-                    setProgress(e.offsetX);
-                    var p = e.offsetX/barWidth;
-                    p = p == 1 ? 0.999 : p;
-                    var i = Math.floor(p*data.length);
-                    player.start(i);
-                    clearAnimation();
-                    setProgress(e.offsetX);
-                    setAnimation(animationSpeed);
-                // }else{
-                //     flag = true;
-                // }
+                setProgress(e.offsetX);
+                var p = e.offsetX/barWidth;
+                p = p == 1 ? 0.999 : p;
+                var i = Math.floor(p*data.length);
+                player.start(i);
+                clearAnimation();
+                setProgress(e.offsetX);
+                setAnimation(animationSpeed);
             });
             //避免拖动小圆点的时候触发点击实事件
             $("#player-pointer").click(function(e){
@@ -207,11 +206,9 @@
                 p = p == 1 ? 0.999 : p;
                 var i = Math.floor(p*data.length);
                 player.start(i);
-                //可能会触发点击事件
             });
             progress.onmove(function(){
                 //移动中
-                // flag = false;
                 $('.player-line').width($("#player-pointer").css('left'));
                 if(parseInt($("#player-pointer").css('left')) >= barWidth){
                     setProgress(barWidth);
@@ -280,6 +277,86 @@
             }
             window.E = $.extend(window.E, { drag:drag });
         })();
+
+        // function mapPlayer(data,unitCb,option){
+        //     var maper = new Player(data, unitCb,option);
+        // }
+        // function Player(data,unitCb,option){
+        //     option = $.extend({
+        //         autoPlay:true,
+        //         currentSecond:0
+        //     },option);
+        //     this.data = data;
+        //     var currentSecond = 0,timer,speed = 1;
+        //     this.setCurrentSecond = function(sec){
+        //         currentSecond = sec;
+        //         unitCb(this.getEffectiveData(sec),sec)
+        //     };
+        //     //初始化
+        //     this.init = function(){
+        //         this.reset();
+        //         option.currentSecond!=0 && this.setCurrentSecond(option.currentSecond);
+        //         option.autoPlay && this.start();
+        //     };
+        //     //复位 归零
+        //     this.reset = function(){
+        //         this.stop();
+        //     }
+        //     this.start = function(){
+        //         stopTimer();
+        //         timer = setInterval(function(){
+        //             if(currentSecond >= this.data.length){
+        //                 this.stop();
+        //                 return;
+        //             }
+        //             this.setCurrentSecond(++currentSecond);
+        //         }.bind(this),unitTime);
+        //     };
+        //     this.pause = function(){
+        //         stopTimer();
+        //     };
+        //     //停止  复位 归零
+        //     this.stop = function(){
+        //         stopTimer();
+        //         this.setCurrentSecond(0);
+        //     };
+        //     this.getTotalTime = function(){
+        //         return formatTime(this.data.length);
+        //     };
+        //     this.getCurrentTime = function(){
+        //         return formatTime(currentSecond);
+        //     }
+        //     this.quickSpeed = function(cb){
+        //         switch(speed){
+        //             case 1:speed = 2;unitTime = 500;break;
+        //             case 2:speed = 4;unitTime = 250;break;
+        //             case 4:speed = 8;unitTime = 125;break;
+        //             case 8:speed = 1;unitTime = 1000;break;
+        //         }
+        //         this.start();
+        //         cb && cb(speed);
+        //     }
+        //     //根据总数据索引 得到有效数据
+        //     this.getEffectiveData = function(ix){
+        //         for(;!this.data[ix];ix--);
+        //         return this.data[ix] || null;
+        //     }
+
+        //     function stopTimer(){
+        //         if(timer){clearInterval(timer);timer = null;}
+        //     }
+        //     function formatTime(ix){
+        //         //ix =  (ix && ix >= 0) ? ix : 0;
+        //         var sec = ix % 60;
+        //         var min = Math.floor(ix / 60);
+        //         if(sec<10) sec = '0'+sec;
+        //         if(min<10) min = '0'+min;
+        //         return min+':'+sec;
+        //     }
+
+        //     this.init();
+        // }
+
     </script>
 
 
