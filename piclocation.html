@@ -3,7 +3,7 @@
 <head>
 	<meta charset="utf-8">
 	<meta name="viewport" content="width=device-width, initial-scale=1.0, minimum-scale=1.0, maximum-scale=2.0,user-scalable=no"/>
-	<title>exif图片位置</title>
+	<title>地图位置</title>
 	<link href="leaflet.css" rel="stylesheet">
 	<script src='leaflet-src.js'></script>
 	<style>
@@ -54,8 +54,14 @@
 
 		if(u_O.lng && u_O.lat){
 			var marker = L.marker(u_O).addTo(map)
+			var height = 220, width = 220
+			if (u_O.width && u_O.height) {
+				var rate = Math.min(220/u_O.width, 220/u_O.height)
+				height = u_O.height * rate
+				width = u_O.width * rate
+			}
 			if (u_O.img) {
-				marker.bindPopup('<div class="popupImg" style="height:220px;width:220px;overflow:hidden;background:#f3f3f3;text-align:center;line-height:220px;color:#aaa;position:relative;"><span style="position:absolute;width:100%;height:30px;line-height:30px;bottom:0;left:0;text-align:center;color:white;text-shadow:0 0 8px black;">'+ decodeURIComponent(u_O.time) +'</span><img onerror="picError(this)" style="max-width:220px;max-height:220px;display:block;margin:auto;" src="'+u_O.img+'"></div>',{offset:[0,-40],closeButton:false,className:'popup_diy'})
+				marker.bindPopup('<div class="popupImg" style="height:'+height+'px;width:'+width+'px;overflow:hidden;background:#f3f3f3;text-align:center;line-height:'+ height +'px;color:#aaa;position:relative;"><span style="position:absolute;width:100%;height:30px;line-height:30px;bottom:0;left:0;text-align:center;color:white;text-shadow:0 0 8px black;">'+ decodeURIComponent(u_O.time) +'</span><img onerror="picError(this)" style="max-width:220px;max-height:220px;height:'+height+'px;width:'+width+'px;display:block;margin:auto;" src="'+u_O.img+'"></div>',{offset:[0,-40],closeButton:false,className:'popup_diy'})
 				.openPopup();
 			}
 			map.setView(u_O, 17);
